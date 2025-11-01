@@ -3,20 +3,33 @@
 
 WebSocketsClient webSocket;
 
-// const char* ssid = "r.singh@unifi";
 const char* ssid = "HUAWEI P20 Pro";
-// const char* password = "17243476";
 const char* password = "ron041228";
-const char* serverHost = "192.168.43.33";  // Replace with your server’s IP
+const char* serverHost = "192.168.43.33";   // Your Node.js server IP
 const int serverPort = 3000;
 
-// The BOOT button is connected to GPIO0
-const int buttonPin = 9;
-bool lastState = HIGH;  // BOOT button is HIGH by default
+const int buttonPin = 9;  // BOOT button on ESP32 = GPIO0
+
+volatile bool buttonPressed = false;
+volatile bool currentState = HIGH;  // Default state (unpressed)
+volatile unsigned long lastInterruptTime = 0;
+
+void IRAM_ATTR handleButtonInterrupt() {
+  unsigned long currentTime = millis();
+  // Basic debounce: ignore interrupts within 150ms
+  if (currentTime - lastInterruptTime > 150) {
+    currentState = digitalRead(buttonPin);
+    buttonPressed = true;
+    lastInterruptTime = currentTime;
+  }
+}
 
 void setup() {
   Serial.begin(115200);
   pinMode(buttonPin, INPUT_PULLUP);
+
+  // Attach interrupt on state change (press or release)
+  attachInterrupt(digitalPinToInterrupt(buttonPin), handleButtonInterrupt, CHANGE);
 
   Serial.println("Connecting to WiFi...");
   WiFi.begin(ssid, password);
@@ -28,7 +41,6 @@ void setup() {
   Serial.print("ESP32 IP: ");
   Serial.println(WiFi.localIP());
 
-  // Connect to WebSocket server
   webSocket.begin(serverHost, serverPort, "/");
   webSocket.onEvent(webSocketEvent);
   Serial.println("Connecting to WebSocket server...");
@@ -37,14 +49,15 @@ void setup() {
 void loop() {
   webSocket.loop();
 
-  bool currentState = digitalRead(buttonPin);
+  // Check if interrupt occurred
+  if (buttonPressed) {
+    buttonPressed = false;
 
-  // Detect button press/release
-  if (currentState != lastState) {
-    lastState = currentState;
-
+    // Determine charger status based on button state
     String status = currentState == LOW ? "in_use" : "available";
     String json = "{\"charger_id\":\"EV001\",\"status\":\"" + status + "\"}";
+
+    // Send JSON message to WebSocket
     webSocket.sendTXT(json);
     Serial.println("Sent: " + json);
   }
