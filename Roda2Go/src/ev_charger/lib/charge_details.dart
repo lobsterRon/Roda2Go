@@ -40,16 +40,16 @@ class _ChargeDetailsScreenState extends State<ChargeDetailsScreen> {
 
     switch (_stage) {
       case 0:
-        imagePath = 'assets/charging_start.png';
+        imagePath = 'assets/start_charging.jpg';
         message = "Charger identified.\nEnjoy charging!";
         break;
       case 1:
-        imagePath = 'assets/charging_complete.png';
+        imagePath = 'assets/return_plug.jpg';
         message = "Charging complete.\nPlease return the plug!";
         break;
       case 2:
       default:
-        imagePath = 'assets/thank_you.png';
+        imagePath = 'assets/finish_charging.png';
         message = "Thank you.\nYou are good to go!";
     }
 

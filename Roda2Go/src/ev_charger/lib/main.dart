@@ -1,10 +1,12 @@
 import 'package:ev_charger/charge_details.dart';
 import 'package:ev_charger/charger_details_page.dart';
 import 'package:ev_charger/qr_scanner.dart';
+import 'package:ev_charger/websocket_service.dart';
 import 'package:flutter/material.dart';
 import 'home_page.dart';
 
 void main() {
+  WebSocketService().connect();
   runApp(const Roda2GoApp());
 }
 

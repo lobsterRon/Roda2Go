@@ -2,6 +2,7 @@ import 'package:ev_charger/charger_details_page.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../websocket_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -14,6 +15,7 @@ class _HomePageState extends State<HomePage> {
   late GoogleMapController _mapController;
   final Set<Marker> _markers = {};
   Map<String, dynamic>? _selectedCharger;
+  String gentariUtp01Status = "Unknown";
 
   final List<Map<String, dynamic>> chargers = [
     {
@@ -45,6 +47,19 @@ class _HomePageState extends State<HomePage> {
         ),
       );
     }
+
+    // Listen for real-time updates
+    WebSocketService().stream.listen((data) {
+      if (data["type"] == "status_update" &&
+          data["chargerId"] == "GENTARI_UTP01") {
+
+        setState(() {
+          gentariUtp01Status = data["status"];
+        });
+
+        print("🔄 Updated status: $gentariUtp01Status");
+      }
+    });
   }
 
   Future<void> _openGoogleMaps(LatLng position) async {
@@ -112,6 +127,23 @@ class _HomePageState extends State<HomePage> {
           ),
 
           // 🟩 Top Bar
+          // 🟢 Gradient background behind top bar
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 90,
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.green, Color(0xFF66BB6A)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+            ),
+          ),
+
           Positioned(
             top: 40,
             left: 16,
@@ -119,20 +151,44 @@ class _HomePageState extends State<HomePage> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Left: App Logo
-                Image.asset(
-                  'assets/logo.png',
-                  height: 40, // adjust as needed
+                // 💳 Wallet balance (right corner)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.15),
+                        blurRadius: 6,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.account_balance_wallet, color: Colors.green, size: 20),
+                      SizedBox(width: 6),
+                      Text(
+                        "RM 26.00",
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-
-                // Right: Notification Icon
+                // 🔔 Notification Icon (left corner)
                 IconButton(
-                  icon: const Icon(Icons.notifications, color: Colors.black, size: 28),
+                  icon: const Icon(Icons.notifications, color: Colors.white, size: 30),
                   onPressed: () => _showSnack("No new notifications"),
                 ),
               ],
             ),
           ),
+
 
           if (_selectedCharger != null) _buildChargerInfoSheet(),
         ],

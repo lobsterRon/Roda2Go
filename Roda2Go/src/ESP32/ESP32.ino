@@ -5,72 +5,73 @@ WebSocketsClient webSocket;
 
 const char* ssid = "HUAWEI P20 Pro";
 const char* password = "ron041228";
-const char* serverHost = "192.168.43.33";   // Your Node.js server IP
+const char* serverHost = "192.168.43.33";  // Node.js server IP
 const int serverPort = 3000;
 
-const int buttonPin = 9;  // BOOT button on ESP32 = GPIO0
+const int buttonPin = 9;  // BOOT button on ESP32 (GPIO0)
 
 volatile bool buttonPressed = false;
-volatile bool currentState = HIGH;  // Default state (unpressed)
-volatile unsigned long lastInterruptTime = 0;
+volatile int currentState = HIGH;
+unsigned long lastInterrupt = 0;
 
-void IRAM_ATTR handleButtonInterrupt() {
-  unsigned long currentTime = millis();
-  // Basic debounce: ignore interrupts within 150ms
-  if (currentTime - lastInterruptTime > 150) {
+void IRAM_ATTR handleButton() {
+  unsigned long now = millis();
+  if (now - lastInterrupt > 150) {
     currentState = digitalRead(buttonPin);
     buttonPressed = true;
-    lastInterruptTime = currentTime;
+    lastInterrupt = now;
   }
 }
 
 void setup() {
   Serial.begin(115200);
+
   pinMode(buttonPin, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(buttonPin), handleButton, CHANGE);
 
-  // Attach interrupt on state change (press or release)
-  attachInterrupt(digitalPinToInterrupt(buttonPin), handleButtonInterrupt, CHANGE);
-
-  Serial.println("Connecting to WiFi...");
   WiFi.begin(ssid, password);
+  Serial.println("Connecting to WiFi...");
+
   while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
+    delay(300);
     Serial.print(".");
   }
-  Serial.println("\nConnected to WiFi!");
+
+  Serial.println("\nWiFi connected!");
   Serial.print("ESP32 IP: ");
   Serial.println(WiFi.localIP());
 
+  // Connect to WebSocket server
   webSocket.begin(serverHost, serverPort, "/");
   webSocket.onEvent(webSocketEvent);
-  Serial.println("Connecting to WebSocket server...");
+  webSocket.setReconnectInterval(5000);
 }
 
 void loop() {
   webSocket.loop();
 
-  // Check if interrupt occurred
   if (buttonPressed) {
     buttonPressed = false;
 
-    // Determine charger status based on button state
-    String status = currentState == LOW ? "in_use" : "available";
-    String json = "{\"charger_id\":\"EV001\",\"status\":\"" + status + "\"}";
+    String status = (currentState == LOW) ? "Charging" : "Available";
 
-    // Send JSON message to WebSocket
+    String json = "{\"chargerId\":\"GENTARI_UTP01\",\"status\":\"" + status + "\"}";
+
     webSocket.sendTXT(json);
     Serial.println("Sent: " + json);
   }
 }
 
-void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
+void webSocketEvent(WStype_t type, uint8_t *payload, size_t length) {
   switch(type) {
     case WStype_CONNECTED:
-      Serial.println("Connected to server!");
+      Serial.println("WebSocket Connected!");
       break;
+
     case WStype_DISCONNECTED:
-      Serial.println("Disconnected from server!");
+      Serial.println("WebSocket Disconnected!");
       break;
+
     case WStype_TEXT:
       Serial.printf("Received from server: %s\n", payload);
       break;
