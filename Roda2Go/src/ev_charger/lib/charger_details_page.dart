@@ -40,8 +40,7 @@ class _ChargerDetailsPageState extends State<ChargerDetailsPage> {
 
     // 🔌 Listen for real-time WebSocket updates
     WebSocketService().stream.listen((data) {
-      if (data["type"] == "status_update" &&
-          data["chargerId"] == "GENTARI_UTP01") {
+      if (data["chargerId"] == "GENTARI_UTP01") {
         setState(() {
           chargers[0]["status"] = data["status"];
           chargers[0]["queueTime"] =
@@ -179,7 +178,7 @@ class _ChargerDetailsPageState extends State<ChargerDetailsPage> {
 
                 _buildActionButton(
                   context, "Queue", Colors.orange,
-                  enabled: _selectedIndex != null,
+                  enabled: _selectedIndex != null && chargers[_selectedIndex!]['status'] == "Charging",
                 ),
 
                 _buildActionButton(
@@ -207,9 +206,18 @@ class _ChargerDetailsPageState extends State<ChargerDetailsPage> {
                 ? () {
               if (label == "Charge" || label == "Charging Details") {
                 _handleChargeButton(context);
-              } else {
+
+              } else if (label == "Book Slot") {
+                // Navigate to the booking screen
+                Navigator.pushNamed(
+                  context,
+                  "/slotBooking",
+                  arguments: chargers[_selectedIndex!]["id"],
+                );
+
+              } else if (label == "Queue") {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text("$label action triggered")),
+                  const SnackBar(content: Text("Queue feature coming soon")),
                 );
               }
             }

@@ -1,7 +1,9 @@
 import 'package:ev_charger/charge_details.dart';
 import 'package:ev_charger/charger_details_page.dart';
 import 'package:ev_charger/qr_scanner.dart';
+import 'package:ev_charger/slot_booking.dart';
 import 'package:ev_charger/websocket_service.dart';
+import 'package:ev_charger/your_turn.dart';
 import 'package:flutter/material.dart';
 import 'home_page.dart';
 
@@ -27,6 +29,11 @@ class Roda2GoApp extends StatelessWidget {
         '/qrScanner': (context) => const QRScannerScreen(),
         '/chargerDetails': (context) => const ChargerDetailsPage(location: 'Gentari UTP'),
         '/chargeDetails': (context) => const ChargeDetailsScreen(),
+        "/slotBooking": (context) {
+          final chargerId = ModalRoute.of(context)!.settings.arguments as String;
+          return SlotBookingPage(chargerId: chargerId);
+        },
+        "/yourTurn": (context) => const YourTurnScreen(),
       }
     );
   }
