@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 class QRScannerScreen extends StatefulWidget {
-  const QRScannerScreen({super.key});
+  final double walletBalance; // Pass current balance from HomePage
+
+  const QRScannerScreen({super.key, required this.walletBalance});
 
   @override
   State<QRScannerScreen> createState() => _QRScannerScreenState();
@@ -36,8 +38,12 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
       setState(() => _isScanned = true);
       _controller.stop();
 
-      // ✅ Navigate to Charge Details screen
-      Navigator.pushReplacementNamed(context, '/chargeDetails');
+      // Navigate to ChargeDetailsScreen and return updated balance
+      Navigator.pushReplacementNamed(
+        context,
+        '/chargeDetails',
+        arguments: widget.walletBalance, // pass scanned balance
+      );
     }
   }
 

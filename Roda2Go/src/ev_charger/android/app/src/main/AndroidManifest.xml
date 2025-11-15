@@ -8,8 +8,10 @@
         android:required="false" />
 
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <application
-        android:label="ev_charger"
+        android:label="Roda2Go"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <meta-data

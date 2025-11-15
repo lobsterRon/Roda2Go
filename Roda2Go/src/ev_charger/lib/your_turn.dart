@@ -25,7 +25,7 @@ class YourTurnScreen extends StatelessWidget {
                   "Failure to arrive on time may result in the slot being automatically released to the next user.",
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 20,
+                fontSize: 16,
                 color: Colors.black87,
                 height: 1.4,
               ),

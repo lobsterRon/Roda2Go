@@ -1,5 +1,7 @@
+import 'dart:ui';
 import 'package:ev_charger/charger_details_page.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../websocket_service.dart';
@@ -16,16 +18,20 @@ class _HomePageState extends State<HomePage> {
   final Set<Marker> _markers = {};
   Map<String, dynamic>? _selectedCharger;
   String gentariUtp01Status = "Unknown";
+  LatLng? _currentPosition;
+  BitmapDescriptor? _carIcon;
+  double _walletBalance = 66.00; // initial balance
 
   final List<Map<String, dynamic>> chargers = [
     {
       "id": "EV001",
       "name": "UTP Kompleks Canselor",
-      "position": const LatLng(4.3828504,100.9686896),
+      "position": const LatLng(4.3828504, 100.9686896),
       "power": "22.1kW max",
       "distance": "0.8 km",
       "rating": "4.4",
       "available": true,
+      "chargers_num": 2,
     },
   ];
 
@@ -33,6 +39,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _loadMarkers();
+    _getUserLocation();
   }
 
   void _loadMarkers() {
@@ -52,7 +59,6 @@ class _HomePageState extends State<HomePage> {
     WebSocketService().stream.listen((data) {
       if (data["type"] == "status_update" &&
           data["chargerId"] == "GENTARI_UTP01") {
-
         setState(() {
           gentariUtp01Status = data["status"];
         });
@@ -60,6 +66,26 @@ class _HomePageState extends State<HomePage> {
         print("🔄 Updated status: $gentariUtp01Status");
       }
     });
+  }
+
+  Future<void> _getUserLocation() async {
+    // Request permission
+    LocationPermission permission = await Geolocator.requestPermission();
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      return;
+    }
+
+    Position pos = await Geolocator.getCurrentPosition();
+
+    setState(() {
+      _currentPosition = LatLng(pos.latitude, pos.longitude);
+    });
+
+    // Move camera to user
+    _mapController.animateCamera(
+      CameraUpdate.newLatLngZoom(_currentPosition!, 16),
+    );
   }
 
   Future<void> _openGoogleMaps(LatLng position) async {
@@ -78,16 +104,19 @@ class _HomePageState extends State<HomePage> {
 
   int _selectedIndex = 0;
 
-  void _onBottomNavTap(int index) {
+  void _onBottomNavTap(int index) async {
     setState(() {
       _selectedIndex = index;
     });
 
     if (index == 1) {
-      // QR Scan button
-      Navigator.pushNamed(context, '/qrScanner');
+      // Navigate to QRScanner and wait for result
+      Navigator.pushNamed(
+        context,
+        '/qrScanner',
+        arguments: _walletBalance, // pass current balance
+      );
     } else if (index == 2) {
-      // Profile page (if implemented later)
       _showSnack("Profile screen coming soon!");
     }
   }
@@ -101,7 +130,7 @@ class _HomePageState extends State<HomePage> {
           GoogleMap(
             onMapCreated: (controller) => _mapController = controller,
             initialCameraPosition: const CameraPosition(
-              target: LatLng(4.3991666667, 100.9639722222),
+              target: LatLng(4.39, 100.9639722222),
               zoom: 15,
             ),
             markers: _markers,
@@ -153,7 +182,10 @@ class _HomePageState extends State<HomePage> {
               children: [
                 // 💳 Wallet balance (right corner)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
@@ -165,12 +197,16 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ],
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(Icons.account_balance_wallet, color: Colors.green, size: 20),
+                      Icon(
+                        Icons.account_balance_wallet,
+                        color: Colors.green,
+                        size: 20,
+                      ),
                       SizedBox(width: 6),
                       Text(
-                        "RM 26.00",
+                        "RM ${_walletBalance.toStringAsFixed(2)}",
                         style: TextStyle(
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
@@ -182,13 +218,16 @@ class _HomePageState extends State<HomePage> {
                 ),
                 // 🔔 Notification Icon (left corner)
                 IconButton(
-                  icon: const Icon(Icons.notifications, color: Colors.white, size: 30),
+                  icon: const Icon(
+                    Icons.notifications,
+                    color: Colors.white,
+                    size: 30,
+                  ),
                   onPressed: () => _showSnack("No new notifications"),
                 ),
               ],
             ),
           ),
-
 
           if (_selectedCharger != null) _buildChargerInfoSheet(),
         ],
@@ -205,14 +244,8 @@ class _HomePageState extends State<HomePage> {
             icon: Icon(Icons.ev_station),
             label: "Charger",
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.qr_code),
-            label: "QR Scan",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: "Profile",
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.qr_code), label: "QR Scan"),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
         ],
       ),
     );
@@ -234,6 +267,29 @@ class _HomePageState extends State<HomePage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 🔍 Search Bar
+            TextField(
+              onChanged: (value) {
+                // TODO: Implement search/filter logic if needed
+                print("Searching: $value");
+              },
+              decoration: InputDecoration(
+                hintText: "Search chargers...",
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                filled: true,
+                fillColor: Colors.grey[200],
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 0,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
             // Station Title
             Text(
               charger['name'],
@@ -241,7 +297,7 @@ class _HomePageState extends State<HomePage> {
             ),
             const SizedBox(height: 8),
             Text("Power: ${charger['power']}"),
-            Text("Price: ${charger['price']}"),
+            Text("Number of chargers: ${charger['chargers_num']}"),
             const SizedBox(height: 16),
 
             // Two buttons side by side
@@ -293,16 +349,19 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildActionButton(
-      String label, Color color, VoidCallback? onPressed) {
+    String label,
+    Color color,
+    VoidCallback? onPressed,
+  ) {
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
-          backgroundColor: color,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-          minimumSize: const Size(90, 40),
-          shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+        backgroundColor: color,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        minimumSize: const Size(90, 40),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
       child: Text(label, style: const TextStyle(fontSize: 12)),
     );
   }

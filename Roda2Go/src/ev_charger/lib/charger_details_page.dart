@@ -1,5 +1,5 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:ev_charger/websocket_service.dart';
 
 class ChargerDetailsPage extends StatefulWidget {
   final String location;
@@ -10,8 +10,10 @@ class ChargerDetailsPage extends StatefulWidget {
 }
 
 class _ChargerDetailsPageState extends State<ChargerDetailsPage> {
-  bool _isCharging = false;      // Track whether user is charging
-  int? _selectedIndex;           // Track selected charger index
+  bool _isCharging = false;
+  int? _selectedIndex;
+  int? _queuedIndex;             // NEW: which charger is queued
+  Timer? _queueTimer;            // NEW: countdown timer
 
   final List<Map<String, dynamic>> chargers = [
     {
@@ -35,19 +37,62 @@ class _ChargerDetailsPageState extends State<ChargerDetailsPage> {
   ];
 
   @override
-  void initState() {
-    super.initState();
+  void dispose() {
+    _queueTimer?.cancel();
+    super.dispose();
+  }
 
-    // 🔌 Listen for real-time WebSocket updates
-    WebSocketService().stream.listen((data) {
-      if (data["chargerId"] == "GENTARI_UTP01") {
-        setState(() {
-          chargers[0]["status"] = data["status"];
-          chargers[0]["queueTime"] =
-          data["status"] == "Charging" ? "≈ 10 mins" : "-";
-        });
-      }
+  // 🔄 Start the queue countdown (1 minute)
+  void _startQueueTimer() {
+    _queueTimer?.cancel(); // safety
+
+    _queueTimer = Timer(const Duration(minutes: 1), () {
+      Navigator.pushNamed(context, "/yourTurn");
     });
+  }
+
+  // ❌ Cancel Queue
+  void _cancelQueue() {
+    _queueTimer?.cancel();
+    setState(() {
+      _queuedIndex = null;
+      _selectedIndex = null;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Queue cancelled."),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  // 🔌 Handle Queue Press
+  void _handleQueue() {
+    if (_queuedIndex == null) {
+      // Starting new queue
+      setState(() => _queuedIndex = _selectedIndex);
+      _startQueueTimer();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("You have joined the queue. You will be notified shortly."),
+        ),
+      );
+    } else {
+      // Cancel existing queue
+      _cancelQueue();
+    }
+  }
+
+  // ⚡ Handle Charge Button
+  Future<void> _handleChargeButton(BuildContext context) async {
+    if (_isCharging) {
+      Navigator.pushNamed(context, "/chargeDetails");
+    } else {
+      Navigator.pushNamed(context, "/qrScanner");
+      setState(() => _isCharging = true);
+    }
   }
 
   @override
@@ -58,101 +103,98 @@ class _ChargerDetailsPageState extends State<ChargerDetailsPage> {
         elevation: 1,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            _queueTimer?.cancel();
+            Navigator.pop(context);
+          },
         ),
         title: Text(
           widget.location,
           style: const TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-          ),
+              color: Colors.black, fontWeight: FontWeight.bold),
         ),
       ),
 
       body: Column(
         children: [
-          // Charger List UI
           Expanded(
             child: ListView.builder(
               itemCount: chargers.length,
               itemBuilder: (context, index) {
                 final charger = chargers[index];
                 final isSelected = _selectedIndex == index;
+                final queueLocked = _queuedIndex != null && _queuedIndex != index;
 
                 return GestureDetector(
-                  onTap: () => setState(() => _selectedIndex = index),
-                  child: Card(
-                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    elevation: 3,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(
-                        color: isSelected ? Colors.green : Colors.transparent,
-                        width: 2,
+                  onTap: queueLocked
+                      ? null
+                      : () => setState(() => _selectedIndex = index),
+                  child: Opacity(
+                    opacity: queueLocked ? 0.4 : 1.0,
+                    child: Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      elevation: 3,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(
+                          color: isSelected ? Colors.green : Colors.transparent,
+                          width: 2,
+                        ),
                       ),
-                    ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(charger['id'],
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold, fontSize: 16)),
+                                Text(charger['power'],
+                                    style: const TextStyle(color: Colors.grey)),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
 
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Title row
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(charger['id'],
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold, fontSize: 16)),
-                              Text(charger['power'],
-                                  style: const TextStyle(color: Colors.grey)),
-                            ],
-                          ),
-
-                          const SizedBox(height: 6),
-
-                          // Type & status row
-                          Row(
-                            children: [
-                              const Icon(Icons.ev_station,
-                                  color: Colors.green, size: 18),
-                              const SizedBox(width: 6),
-                              Text(charger['type'],
-                                  style: const TextStyle(color: Colors.black87)),
-                              const Spacer(),
-                              Text(
-                                charger['status'],
-                                style: TextStyle(
-                                    color: charger['status'] == "Charging"
-                                        ? Colors.orange
-                                        : Colors.green,
-                                    fontWeight: FontWeight.bold),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 6),
-
-                          // Queue time if charging
-                          if (charger['status'] == "Charging")
                             Row(
                               children: [
-                                const Icon(Icons.timer_outlined,
-                                    size: 16, color: Colors.orange),
-                                const SizedBox(width: 4),
+                                const Icon(Icons.ev_station,
+                                    color: Colors.green, size: 18),
+                                const SizedBox(width: 6),
+                                Text(charger['type']),
+                                const Spacer(),
                                 Text(
-                                  "Est. Queue Time: ${charger['queueTime']}",
-                                  style: const TextStyle(
-                                      color: Colors.orange, fontSize: 13),
+                                  charger['status'],
+                                  style: TextStyle(
+                                      color: charger['status'] == "Charging"
+                                          ? Colors.orange
+                                          : Colors.green,
+                                      fontWeight: FontWeight.bold),
                                 ),
                               ],
                             ),
 
-                          const SizedBox(height: 6),
-                          Text(charger['price']),
-                          Text(charger['extra'],
-                              style: const TextStyle(color: Colors.grey)),
-                        ],
+                            if (charger['status'] == "Charging")
+                              Row(
+                                children: [
+                                  const Icon(Icons.timer_outlined,
+                                      size: 16, color: Colors.orange),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    "Est. Queue Time: ${charger['queueTime']}",
+                                    style: const TextStyle(
+                                        color: Colors.orange, fontSize: 13),
+                                  ),
+                                ],
+                              ),
+                            const SizedBox(height: 6),
+                            Text(charger['price']),
+                            Text(charger['extra'],
+                                style: const TextStyle(color: Colors.grey)),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -161,29 +203,45 @@ class _ChargerDetailsPageState extends State<ChargerDetailsPage> {
             ),
           ),
 
-          // Bottom Buttons
+          // 🟢 Bottom Buttons
           Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
+                // Charge Button
                 _buildActionButton(
                   context,
                   _isCharging ? "Charging Details" : "Charge",
                   Colors.green,
                   enabled: _selectedIndex != null &&
+                      _queuedIndex == null && // disable when queued
                       (_isCharging
-                          ? chargers[_selectedIndex!]['status'] == "Charging"
-                          : chargers[_selectedIndex!]['status'] == "Available"),
+                          ? chargers[_selectedIndex!]["status"] == "Charging"
+                          : chargers[_selectedIndex!]["status"] == "Available"),
+                  onPressed: () => _handleChargeButton(context),
                 ),
 
+                // Queue Button
                 _buildActionButton(
-                  context, "Queue", Colors.orange,
-                  enabled: _selectedIndex != null && chargers[_selectedIndex!]['status'] == "Charging",
+                  context,
+                  _queuedIndex != null ? "Cancel Queue" : "Queue",
+                  _queuedIndex != null ? Colors.red : Colors.orange,
+                  enabled: _selectedIndex != null &&
+                      (_queuedIndex == null ||
+                          _queuedIndex == _selectedIndex) &&
+                      chargers[_selectedIndex!]["status"] == "Charging",
+                  onPressed: _handleQueue,
                 ),
 
+                // Book Slot button
                 _buildActionButton(
-                  context, "Book Slot", Colors.blue,
-                  enabled: _selectedIndex != null,
+                  context,
+                  "Book Slot",
+                  Colors.blue,
+                  enabled: _selectedIndex != null && _queuedIndex == null,
+                  onPressed: () {
+                    Navigator.pushNamed(context, "/slotBooking", arguments: chargers[_selectedIndex!]["id"]);
+                  },
                 ),
               ],
             ),
@@ -193,55 +251,27 @@ class _ChargerDetailsPageState extends State<ChargerDetailsPage> {
     );
   }
 
-  Widget _buildActionButton(
-      BuildContext context, String label, Color color,
-      {bool enabled = true}) {
+  // BUTTON BUILDER
+  Widget _buildActionButton(BuildContext context, String label, Color color,
+      {required bool enabled, required VoidCallback onPressed}) {
     return Expanded(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4),
         child: Opacity(
-          opacity: enabled ? 1.0 : 0.4,
+          opacity: enabled ? 1 : 0.4,
           child: ElevatedButton(
-            onPressed: enabled
-                ? () {
-              if (label == "Charge" || label == "Charging Details") {
-                _handleChargeButton(context);
-
-              } else if (label == "Book Slot") {
-                // Navigate to the booking screen
-                Navigator.pushNamed(
-                  context,
-                  "/slotBooking",
-                  arguments: chargers[_selectedIndex!]["id"],
-                );
-
-              } else if (label == "Queue") {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Queue feature coming soon")),
-                );
-              }
-            }
-                : null,
+            onPressed: enabled ? onPressed : null,
             style: ElevatedButton.styleFrom(
               backgroundColor: color,
               foregroundColor: Colors.white,
               minimumSize: const Size(double.infinity, 50),
-              shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
             ),
             child: Text(label),
           ),
         ),
       ),
     );
-  }
-
-  Future<void> _handleChargeButton(BuildContext context) async {
-    if (_isCharging) {
-      Navigator.pushNamed(context, "/chargeDetails");
-    } else {
-      Navigator.pushNamed(context, "/qrScanner");
-      setState(() => _isCharging = true);
-    }
   }
 }

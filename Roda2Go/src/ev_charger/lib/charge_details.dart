@@ -2,25 +2,28 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 class ChargeDetailsScreen extends StatefulWidget {
-  const ChargeDetailsScreen({super.key});
+  final double initialBalance;
+  const ChargeDetailsScreen({super.key, required this.initialBalance});
 
   @override
   State<ChargeDetailsScreen> createState() => _ChargeDetailsScreenState();
 }
 
 class _ChargeDetailsScreenState extends State<ChargeDetailsScreen> {
-  int _stage = 0; // 0 = identified, 1 = charging complete, 2 = thank you
+  int _stage = 0;
   double _opacity = 1.0;
+  late double _balance;
 
   @override
   void initState() {
     super.initState();
+    _balance = widget.initialBalance;
     _startStageTransitions();
   }
 
   void _startStageTransitions() {
-    Timer(const Duration(minutes: 2), () => _changeStage(1));
-    Timer(const Duration(minutes: 3), () => _changeStage(2));
+    Timer(const Duration(seconds: 30), () => _changeStage(1));
+    Timer(const Duration(seconds: 60), () => _changeStage(2));
   }
 
   void _changeStage(int newStage) {
@@ -50,7 +53,9 @@ class _ChargeDetailsScreenState extends State<ChargeDetailsScreen> {
       case 2:
       default:
         imagePath = 'assets/finish_charging.png';
-        message = "Thank you.\nYou are good to go!";
+        message =
+        "Thank you for using Roda2Go!\nTotal charge amount for this session: RM50.00\nYou are good to go!";
+        break;
     }
 
     return Scaffold(
@@ -61,7 +66,8 @@ class _ChargeDetailsScreenState extends State<ChargeDetailsScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {
-            Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+            // Return updated balance when going back
+            Navigator.pop(context, _balance - 50.0);
           },
         ),
         title: const Text(
@@ -85,18 +91,14 @@ class _ChargeDetailsScreenState extends State<ChargeDetailsScreen> {
                 Text(
                   message,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green,
-                  ),
+                  style: const TextStyle(fontSize: 18),
                 ),
                 const SizedBox(height: 40),
                 if (_stage == 2)
                   ElevatedButton(
                     onPressed: () {
-                      Navigator.pushNamedAndRemoveUntil(
-                          context, '/', (route) => false);
+                      // Return updated balance to HomePage
+                      Navigator.pop(context, _balance - 50.0);
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,

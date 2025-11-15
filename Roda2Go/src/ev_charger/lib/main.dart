@@ -25,15 +25,40 @@ class Roda2GoApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
       ),
       home: const HomePage(),
-      routes: {
-        '/qrScanner': (context) => const QRScannerScreen(),
-        '/chargerDetails': (context) => const ChargerDetailsPage(location: 'Gentari UTP'),
-        '/chargeDetails': (context) => const ChargeDetailsScreen(),
-        "/slotBooking": (context) {
-          final chargerId = ModalRoute.of(context)!.settings.arguments as String;
-          return SlotBookingPage(chargerId: chargerId);
-        },
-        "/yourTurn": (context) => const YourTurnScreen(),
+        onGenerateRoute: (settings) {
+          switch (settings.name) {
+            case '/qrScanner':
+              final walletBalance = settings.arguments as double?;
+              return MaterialPageRoute(
+                builder: (context) => QRScannerScreen(walletBalance: walletBalance ?? 0),
+              );
+
+            case '/chargeDetails':
+              final initialBalance = settings.arguments as double?;
+              return MaterialPageRoute(
+                builder: (context) => ChargeDetailsScreen(initialBalance: initialBalance ?? 0),
+              );
+
+            case '/chargerDetails':
+              final location = settings.arguments as String?;
+              return MaterialPageRoute(
+                builder: (context) => ChargerDetailsPage(location: location ?? 'Unknown'),
+              );
+
+            case '/slotBooking':
+              final chargerId = settings.arguments as String;
+              return MaterialPageRoute(
+                builder: (context) => SlotBookingPage(chargerId: chargerId),
+              );
+
+            case '/yourTurn':
+              return MaterialPageRoute(
+                builder: (context) => const YourTurnScreen(),
+              );
+
+            default:
+              return null;
+          }
       }
     );
   }
