@@ -11,6 +11,7 @@ class ChargerDetailsPage extends StatefulWidget {
 }
 
 class _ChargerDetailsPageState extends State<ChargerDetailsPage> {
+  StreamSubscription? wsSubscription;
   bool _isCharging = false;
   int? _selectedIndex;
   int? _queuedIndex;             // NEW: which charger is queued
@@ -20,12 +21,14 @@ class _ChargerDetailsPageState extends State<ChargerDetailsPage> {
   void initState() {
     super.initState();
 
-    WebSocketService().stream.listen((data) {
-      if (data["chargerId"] == "GENTARI_UTP01") {
+    wsSubscription = WebSocketService().stream.listen((data) {
+      if (!mounted) return;
 
+      if (data["chargerId"] == "GENTARI_UTP01") {
         setState(() {
           chargers[0]["status"] = data["status"];
-          chargers[0]["queueTime"] = data["status"] == "Charging" ? "≈ 2 hrs" : "-";
+          chargers[0]["queueTime"] =
+          data["status"] == "Charging" ? "≈ 2 hrs" : "-";
         });
       }
     });
@@ -55,6 +58,7 @@ class _ChargerDetailsPageState extends State<ChargerDetailsPage> {
 
   @override
   void dispose() {
+    wsSubscription?.cancel();
     _queueTimer?.cancel();
     super.dispose();
   }
