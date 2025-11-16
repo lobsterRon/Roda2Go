@@ -53,7 +53,7 @@ void loop() {
   if (buttonPressed) {
     buttonPressed = false;
 
-    String status = (currentState == LOW) ? "Charging" : "Available";
+    String status = (currentState == LOW) ? "Available" : "Charging";
 
     String json = "{\"chargerId\":\"GENTARI_UTP01\",\"status\":\"" + status + "\"}";
 

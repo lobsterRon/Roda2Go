@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:ev_charger/websocket_service.dart';
 
 class ChargerDetailsPage extends StatefulWidget {
   final String location;
@@ -15,6 +16,22 @@ class _ChargerDetailsPageState extends State<ChargerDetailsPage> {
   int? _queuedIndex;             // NEW: which charger is queued
   Timer? _queueTimer;            // NEW: countdown timer
 
+  @override
+  void initState() {
+    super.initState();
+
+    WebSocketService().stream.listen((data) {
+      if (data["chargerId"] == "GENTARI_UTP01") {
+
+        setState(() {
+          chargers[0]["status"] = data["status"];
+          chargers[0]["queueTime"] = data["status"] == "Charging" ? "≈ 2 hrs" : "-";
+        });
+      }
+    });
+  }
+
+
   final List<Map<String, dynamic>> chargers = [
     {
       "id": "GENTARI_UTP01",
@@ -23,7 +40,7 @@ class _ChargerDetailsPageState extends State<ChargerDetailsPage> {
       "status": "Charging",
       "price": "RM 1.15 / kWh",
       "extra": "+ RM 1.00 / min (after 4 hours)",
-      "queueTime": "≈ 10 mins",
+      "queueTime": "≈ 2 hrs",
     },
     {
       "id": "GENTARI_UTP02",

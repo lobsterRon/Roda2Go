@@ -12,7 +12,7 @@ class SlotBookingPage extends StatefulWidget {
 class _SlotBookingPageState extends State<SlotBookingPage> {
   DateTime now = DateTime.now();
   int dayOffset = 0;
-
+  final List<int> peakHours = [17, 18, 19, 20]; // 5 PM – 8 PM
   List<String> selectedSlots = [];
 
   @override
@@ -85,12 +85,28 @@ class _SlotBookingPageState extends State<SlotBookingPage> {
 
                 bool isPast = slot.isBefore(now);
                 bool isNext5Hours = slot.isBefore(now.add(const Duration(hours: 5)));
+                bool isPeakHour = peakHours.contains(slot.hour);
 
                 bool isDisabled = (dayOffset == 0 && (isPast || isNext5Hours));
                 bool isSelected = selectedSlots.contains(label);
 
                 return GestureDetector(
-                  onTap: isDisabled ? null : () => _toggleSlot(label),
+                  onTap: () {
+                    if (isDisabled) return;
+
+                    if (isPeakHour) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            "Please subscribe as a premium driver to enjoy booking at peak hours.",
+                          ),
+                        ),
+                      );
+                      return;
+                    }
+
+                    _toggleSlot(label);
+                  },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     decoration: BoxDecoration(
@@ -98,10 +114,15 @@ class _SlotBookingPageState extends State<SlotBookingPage> {
                           ? Colors.grey[300]
                           : isSelected
                           ? Colors.green
+                          : isPeakHour
+                          ? Colors.orange[200]
                           : Colors.white,
-                      borderRadius: BorderRadius.circular(_radiusForSlot(label)),
+                      borderRadius: BorderRadius.circular(isPeakHour ? 8 :_radiusForSlot(label)),
                       border: Border.all(
-                        color: isSelected ? Colors.green : Colors.black26,
+                        color: isSelected ? Colors.green
+                            : isPeakHour
+                            ? Colors.orange
+                            : Colors.black26,
                         width: 1.5,
                       ),
                     ),
@@ -111,6 +132,8 @@ class _SlotBookingPageState extends State<SlotBookingPage> {
                       style: TextStyle(
                         color: isDisabled
                             ? Colors.black38
+                            : isPeakHour
+                            ? Colors.red
                             : isSelected
                             ? Colors.white
                             : Colors.black87,
