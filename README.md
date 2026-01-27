@@ -1,0 +1,1 @@
+A prototype scheduling app for EV charging. Charger real time availability data from ESP32 board was transmitted to the NodeJS + WebSocket local server to be displayed in the Flutter frontend application.
